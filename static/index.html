@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume Tailor v1.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .log-box { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.72rem; }
+    .pass-step.done  { background: #22c55e; color: white; }
+    .pass-step.active { background: #3b82f6; color: white; animation: pulse 1.5s infinite; }
+    .pass-step.idle  { background: #e5e7eb; color: #6b7280; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+    .status-queued      { background:#e0f2fe; color:#0369a1; }
+    .status-generating  { background:#fef3c7; color:#92400e; }
+    .status-done        { background:#d1fae5; color:#065f46; }
+    .status-error       { background:#fee2e2; color:#991b1b; }
+    .status-applied     { background:#dbeafe; color:#1e40af; }
+    .status-interviewing{ background:#ede9fe; color:#5b21b6; }
+    .status-rejected    { background:#f3f4f6; color:#374151; }
+    .status-offer       { background:#fce7f3; color:#9d174d; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="resumeApp()" x-init="init()">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-gray-900">Resume Tailor</h1>
+        <p class="text-xs text-gray-500">v1.0 — Local AI Pipeline</p>
+      </div>
+    </div>
+    <!-- Tabs -->
+    <nav class="flex gap-1 bg-gray-100 rounded-lg p-1">
+      <button @click="tab='new'"
+        :class="tab==='new' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all">
+        New Application
+      </button>
+      <button @click="tab='dashboard'"
+        :class="tab==='dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all">
+        Dashboard
+        <span x-show="applications.length > 0" class="ml-1.5 bg-indigo-100 text-indigo-700 text-xs px-1.5 py-0.5 rounded-full" x-text="applications.length"></span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- ===== NEW APPLICATION TAB ===== -->
+  <main x-show="tab==='new'" x-cloak class="max-w-3xl mx-auto px-6 py-8">
+
+    <!-- Input Form (hidden while running) -->
+    <div x-show="!running && !finished">
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-1">Tailor your resume</h2>
+        <p class="text-sm text-gray-500">Paste a job description and the AI pipeline will generate a tailored resume in under 5 minutes.</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Job Description</label>
+          <textarea
+            x-model="jdText"
+            rows="12"
+            placeholder="Paste the full job description here..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+          ></textarea>
+          <p x-show="jdText.length > 0" class="mt-1 text-xs text-gray-400" x-text="`${jdText.length} characters`"></p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Job URL <span class="font-normal text-gray-400">(optional — enables Apply button)</span></label>
+          <input
+            type="url"
+            x-model="jobUrl"
+            placeholder="https://www.linkedin.com/jobs/view/..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" x-model="noPdf" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+            Skip PDF generation (faster)
+          </label>
+          <button
+            @click="generate()"
+            :disabled="!jdText.trim()"
+            :class="jdText.trim() ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+            class="px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Generate Resume
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Banner -->
+    <div x-show="errorMsg" class="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-start gap-3">
+      <svg class="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-sm text-red-700" x-text="errorMsg"></p>
+    </div>
+
+    <!-- Progress Panel (shown while running or finished) -->
+    <div x-show="running || finished">
+      <!-- Pass Progress Bar -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-gray-700">Pipeline Progress</h3>
+          <span x-show="running" class="flex items-center gap-1.5 text-xs text-blue-600">
+            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Running...
+          </span>
+          <span x-show="finished && !pipelineError" class="text-xs text-green-600 font-medium">✓ Complete</span>
+          <span x-show="pipelineError" class="text-xs text-red-600 font-medium">✗ Failed</span>
+        </div>
+
+        <!-- Steps -->
+        <div class="flex gap-2">
+          <template x-for="(step, i) in passSteps" :key="i">
+            <div class="flex-1 text-center">
+              <div
+                :class="{
+                  'done': step.done,
+                  'active': step.active,
+                  'idle': !step.done && !step.active
+                }"
+                class="pass-step rounded-lg py-2 px-1 text-xs font-medium transition-all duration-300">
+                <div class="font-bold" x-text="`P${i+1}`"></div>
+                <div class="opacity-75 truncate" x-text="step.label"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Stats grid -->
+        <div x-show="stats.length > 0" class="mt-4 grid grid-cols-2 gap-2">
+          <template x-for="s in stats" :key="s.key">
+            <div class="bg-gray-50 rounded-lg px-3 py-2">
+              <p class="text-xs text-gray-500" x-text="s.key"></p>
+              <p class="text-sm font-semibold text-gray-800" x-text="s.value"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Score Card -->
+      <div x-show="scores.overall !== null" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-4">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Final Score</h3>
+        <div class="flex items-center gap-6">
+          <div class="text-center">
+            <div class="text-4xl font-bold" :class="scores.overall >= 80 ? 'text-green-600' : scores.overall >= 60 ? 'text-yellow-600' : 'text-red-600'" x-text="`${scores.overall}/100`"></div>
+            <div class="text-xs text-gray-500 mt-0.5">Overall</div>
+          </div>
+          <div class="flex-1 space-y-2">
+            <div>
+              <div class="flex justify-between text-xs text-gray-600 mb-1">
+                <span>ATS Coverage</span>
+                <span x-text="`${scores.ats}/100`"></span>
+              </div>
+              <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full transition-all duration-700" :style="`width:${scores.ats}%`"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs text-gray-600 mb-1">
+                <span>Bullet Quality</span>
+                <span x-text="`${scores.quality}/100`"></span>
+              </div>
+              <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-purple-500 rounded-full transition-all duration-700" :style="`width:${scores.quality}%`"></div>
+              </div>
+            </div>
+            <div x-show="scores.gap !== null">
+              <div class="flex justify-between text-xs text-gray-600 mb-1">
+                <span>JD Fit (incl. blocked)</span>
+                <span x-text="`${scores.gap}/100`"></span>
+              </div>
+              <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-orange-400 rounded-full transition-all duration-700" :style="`width:${scores.gap}%`"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Download Buttons -->
+      <div x-show="finished && !pipelineError" class="flex gap-3 mb-4">
+        <a :href="`/api/applications/${currentAppId}/resume`" download
+           class="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Download Resume (.md)
+        </a>
+        <a x-show="hasPdf" :href="`/api/applications/${currentAppId}/pdf`" download
+           class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Download PDF
+        </a>
+      </div>
+
+      <!-- New Application button -->
+      <div x-show="finished" class="flex gap-3">
+        <button @click="resetForm()"
+          class="flex-1 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+          New Application
+        </button>
+        <button @click="tab='dashboard'"
+          class="flex-1 bg-gray-900 hover:bg-gray-800 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+          View Dashboard →
+        </button>
+      </div>
+
+      <!-- Live Log -->
+      <div class="mt-4 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+          <span class="text-xs font-medium text-gray-600">Live Log</span>
+          <button @click="logExpanded=!logExpanded" class="text-xs text-gray-400 hover:text-gray-600">
+            <span x-text="logExpanded ? 'Collapse' : 'Expand'"></span>
+          </button>
+        </div>
+        <div
+          x-ref="logBox"
+          :style="logExpanded ? 'max-height:600px' : 'max-height:200px'"
+          class="log-box overflow-y-auto p-4 bg-gray-900 text-gray-300 transition-all duration-300"
+          style="max-height:200px">
+          <template x-for="(line, i) in logLines" :key="i">
+            <div :class="{
+              'text-yellow-400': line.includes('WARNING'),
+              'text-red-400': line.includes('ERROR'),
+              'text-blue-300': line.includes('INFO'),
+              'text-gray-300': true
+            }" x-text="line" class="leading-5"></div>
+          </template>
+          <div x-show="running" class="text-gray-500 animate-pulse mt-1">▌</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== DASHBOARD TAB ===== -->
+  <main x-show="tab==='dashboard'" x-cloak class="max-w-6xl mx-auto px-6 py-8">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-900">Applications</h2>
+        <p class="text-sm text-gray-500 mt-0.5" x-text="`${applications.length} total`"></p>
+      </div>
+      <button @click="tab='new'; resetForm()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New Application
+      </button>
+    </div>
+
+    <!-- Queue Banner -->
+    <div x-show="queueStatus.active_id" class="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-3">
+      <svg class="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <span class="text-sm text-blue-800">
+        Processing <strong x-text="queueStatus.active_company || 'job'"></strong>
+        <span x-show="queueStatus.queued > 0"> — <span x-text="queueStatus.queued"></span> more queued</span>
+      </span>
+    </div>
+    <div x-show="!queueStatus.active_id && queueStatus.queued > 0" class="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between">
+      <span class="text-sm text-amber-800">
+        <strong x-text="queueStatus.queued"></strong> jobs queued and idle
+      </span>
+      <button @click="startQueue()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">
+        Start Queue
+      </button>
+    </div>
+
+    <!-- Search + Status Filter row -->
+    <div class="flex items-center gap-3 mb-2">
+      <div class="relative flex-1 max-w-xs">
+        <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+        </svg>
+        <input
+          type="search"
+          x-model="searchText"
+          placeholder="Search company or role…"
+          class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+      </div>
+      <div class="flex gap-1">
+        <template x-for="f in ['all','queued','processing','done','applied']" :key="f">
+          <button
+            @click="statusFilter = f"
+            :class="statusFilter === f ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'"
+            class="px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors">
+            <span x-text="f"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Category Filter Tabs (dynamic) -->
+    <div class="flex flex-wrap gap-1 mb-4">
+      <button
+        @click="categoryFilter = 'all'"
+        :class="categoryFilter === 'all' ? 'bg-violet-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'"
+        class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors">
+        All Categories
+      </button>
+      <template x-for="cat in categories" :key="cat">
+        <button
+          @click="categoryFilter = cat"
+          :class="categoryFilter === cat ? 'bg-violet-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'"
+          class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize"
+          x-text="cat.replace(/_/g, ' ')">
+        </button>
+      </template>
+    </div>
+
+    <!-- Empty state -->
+    <div x-show="applications.length === 0" class="bg-white rounded-xl border border-gray-200 p-16 text-center">
+      <div class="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <p class="text-gray-600 font-medium">No applications yet</p>
+      <p class="text-gray-400 text-sm mt-1">Generate your first tailored resume to get started</p>
+    </div>
+
+    <!-- Table -->
+    <div x-show="applications.length > 0" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Company / Role</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700" @click="setSort('score')">
+              Score
+              <span x-show="sortBy==='score'" x-text="sortDir==='asc' ? '↑' : '↓'" class="ml-0.5 text-indigo-500"></span>
+            </th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700" @click="setSort('status')">
+              Status
+              <span x-show="sortBy==='status'" x-text="sortDir==='asc' ? '↑' : '↓'" class="ml-0.5 text-indigo-500"></span>
+            </th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700" @click="setSort('created_at')">
+              Created
+              <span x-show="sortBy==='created_at'" x-text="sortDir==='asc' ? '↑' : '↓'" class="ml-0.5 text-indigo-500"></span>
+            </th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Follow-up</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <template x-for="app in filteredApps()" :key="app.id">
+          <tbody class="divide-y divide-gray-100">
+              <!-- Main row -->
+              <tr class="hover:bg-gray-50 transition-colors cursor-pointer" @click="toggleExpand(app.id)">
+                <td class="px-4 py-3.5">
+                  <div class="font-medium text-gray-900" x-text="app.company || 'Unknown company'"></div>
+                  <div class="text-xs text-gray-500 mt-0.5" x-text="app.role || app.domain || '—'"></div>
+                </td>
+                <td class="px-4 py-3.5">
+                  <div x-show="app.final_score !== null && app.final_score !== undefined">
+                    <span :class="app.final_score >= 80 ? 'text-green-600' : app.final_score >= 60 ? 'text-yellow-600' : 'text-red-600'"
+                          class="font-bold" x-text="`${app.final_score}/100`"></span>
+                    <span class="text-xs text-gray-400 ml-1" x-text="app.gap_score != null ? `fit ${app.gap_score}%` : `ATS ${app.ats_score}`"></span>
+                  </div>
+                  <div x-show="app.final_score === null || app.final_score === undefined" class="text-gray-400 text-xs">—</div>
+                </td>
+                <td class="px-4 py-3.5">
+                  <span :class="`status-${app.status}`" class="px-2 py-1 rounded-full text-xs font-medium capitalize" x-text="app.status"></span>
+                </td>
+                <td class="px-4 py-3.5 text-xs text-gray-500" x-text="formatDate(app.created_at)"></td>
+                <td class="px-4 py-3.5 text-xs" :class="isOverdue(app.follow_up_date) ? 'text-red-600 font-medium' : 'text-gray-500'" x-text="app.follow_up_date || '—'"></td>
+                <td class="px-4 py-3.5 text-right">
+                  <svg :class="expandedId === app.id ? 'rotate-180' : ''" class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </td>
+              </tr>
+              <!-- Expanded detail row -->
+              <tr x-show="expandedId === app.id" x-transition>
+                <td colspan="6" class="px-4 pb-5 pt-0 bg-gray-50">
+                  <div class="border border-gray-200 rounded-lg bg-white p-5 mt-1 space-y-4">
+                    <!-- Status + Downloads -->
+                    <div class="flex flex-wrap items-center gap-4">
+                      <div>
+                        <label class="text-xs font-medium text-gray-500 block mb-1">Status</label>
+                        <select
+                          :value="app.status"
+                          @change="patchApp(app.id, {status: $event.target.value})"
+                          :disabled="app.status === 'generating'"
+                          class="border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                          <option value="queued">Queued</option>
+                          <option value="done">Done</option>
+                          <option value="applied">Applied</option>
+                          <option value="interviewing">Interviewing</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="offer">Offer</option>
+                          <option value="error">Error</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-500 block mb-1">Follow-up date</label>
+                        <input type="date"
+                          :value="app.follow_up_date || ''"
+                          @change="patchApp(app.id, {follow_up_date: $event.target.value})"
+                          class="border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                      </div>
+                      <div class="flex gap-2 ml-auto">
+                        <a x-show="app.resume_path" :href="`/api/applications/${app.id}/resume`" download
+                           class="flex items-center gap-1.5 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-md px-3 py-1.5 text-xs font-medium transition-colors">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+                          Resume (.md)
+                        </a>
+                        <a x-show="app.pdf_path" :href="`/api/applications/${app.id}/pdf`" download
+                           class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md px-3 py-1.5 text-xs font-medium transition-colors">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+                          PDF
+                        </a>
+                        <button x-show="app.status === 'done' && app.job_url" @click.stop="applyAndMark(app)"
+                           class="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md px-3 py-1.5 text-xs font-medium transition-colors">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                          Apply
+                        </button>
+                        <button @click.stop="confirmDelete(app.id)"
+                          class="flex items-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-md px-3 py-1.5 text-xs font-medium transition-colors">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                      <label class="text-xs font-medium text-gray-500 block mb-1">Notes</label>
+                      <textarea
+                        :value="app.notes || ''"
+                        @blur="patchApp(app.id, {notes: $event.target.value})"
+                        rows="3"
+                        placeholder="Add notes about this application..."
+                        class="w-full border border-gray-300 rounded-md text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+                    </div>
+
+                    <!-- Score breakdown (if available) -->
+                    <div x-show="app.final_score !== null && app.final_score !== undefined" class="flex flex-wrap gap-4 text-sm">
+                      <div>
+                        <span class="text-gray-500">Overall:</span>
+                        <span :class="app.final_score >= 80 ? 'text-green-600' : app.final_score >= 60 ? 'text-yellow-600' : 'text-red-600'" class="font-bold ml-1" x-text="`${app.final_score}/100`"></span>
+                      </div>
+                      <div>
+                        <span class="text-gray-500">ATS Coverage:</span>
+                        <span class="text-blue-600 font-medium ml-1" x-text="`${app.ats_score}/100`"></span>
+                      </div>
+                      <div x-show="app.gap_score !== null && app.gap_score !== undefined">
+                        <span class="text-gray-500">JD Fit:</span>
+                        <span class="text-orange-500 font-medium ml-1" x-text="`${app.gap_score}/100`"></span>
+                      </div>
+                      <div>
+                        <span class="text-gray-500">Quality:</span>
+                        <span class="text-purple-600 font-medium ml-1" x-text="`${app.quality_score}/100`"></span>
+                      </div>
+                      <div x-show="app.fabrication_clean !== undefined">
+                        <span class="text-gray-500">Fabrication:</span>
+                        <span :class="app.fabrication_clean ? 'text-green-600' : 'text-red-600'" class="font-medium ml-1" x-text="app.fabrication_clean ? '✓ Clean' : '⚠ Flagged'"></span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+          </tbody>
+        </template>
+      </table>
+    </div>
+  </main>
+
+  <!-- Delete Confirm Modal -->
+  <div x-show="deleteConfirmId" x-cloak class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+      <h3 class="text-base font-semibold text-gray-900 mb-2">Delete application?</h3>
+      <p class="text-sm text-gray-500 mb-5">This will permanently remove the application record and all generated files. This cannot be undone.</p>
+      <div class="flex gap-3">
+        <button @click="deleteConfirmId=null" class="flex-1 border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg py-2 text-sm font-medium">Cancel</button>
+        <button @click="deleteApp(deleteConfirmId)" class="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium">Delete</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+function resumeApp() {
+  return {
+    tab: 'new',
+    jdText: '',
+    jobUrl: '',
+    noPdf: false,
+
+    // Run state
+    running: false,
+    finished: false,
+    pipelineError: false,
+    errorMsg: '',
+    currentAppId: null,
+    hasPdf: false,
+
+    // Progress
+    passSteps: [
+      { label: 'Analyzer',   done: false, active: false },
+      { label: 'Inference',  done: false, active: false },
+      { label: 'Writer',     done: false, active: false },
+      { label: 'Validator',  done: false, active: false },
+      { label: 'Corrector',  done: false, active: false },
+    ],
+    stats: [],
+    scores: { overall: null, ats: null, quality: null, gap: null },
+    logLines: [],
+    logExpanded: false,
+
+    // Dashboard
+    applications: [],
+    categories: [],
+    expandedId: null,
+    deleteConfirmId: null,
+    queueStatus: { queued: 0, active_id: null, active_company: null },
+    statusFilter: 'all',
+    categoryFilter: 'all',
+    sortBy: 'created_at',
+    sortDir: 'desc',
+    searchText: '',
+    _queuePollTimer: null,
+
+    init() {
+      // Restore persisted filter/sort state
+      const ls = localStorage;
+      this.statusFilter   = ls.getItem('rt_statusFilter')   || 'all';
+      this.categoryFilter = ls.getItem('rt_categoryFilter') || 'all';
+      this.sortBy         = ls.getItem('rt_sortBy')         || 'created_at';
+      this.sortDir        = ls.getItem('rt_sortDir')        || 'desc';
+
+      this.$watch('statusFilter',   v => ls.setItem('rt_statusFilter', v));
+      this.$watch('categoryFilter', v => ls.setItem('rt_categoryFilter', v));
+      this.$watch('sortBy',         v => ls.setItem('rt_sortBy', v));
+      this.$watch('sortDir',        v => ls.setItem('rt_sortDir', v));
+
+      // Load dynamic categories
+      fetch('/api/categories').then(r => r.json()).then(cats => { this.categories = cats; });
+
+      // Reconnect if there was an active run before refresh
+      const savedId = sessionStorage.getItem('activeRunId');
+      if (savedId) {
+        this.currentAppId = savedId;
+        this.running = true;
+        this.connectSSE(savedId);
+      }
+      this.$watch('tab', t => {
+        if (t === 'dashboard') {
+          this.loadApplications();
+          this.startQueuePoll();
+          fetch('/api/categories').then(r => r.json()).then(cats => { this.categories = cats; });
+        } else {
+          this.stopQueuePoll();
+        }
+      });
+    },
+
+    async generate() {
+      if (!this.jdText.trim()) return;
+
+      this.errorMsg = '';
+      this.running = true;
+      this.finished = false;
+      this.pipelineError = false;
+      this.logLines = [];
+      this.stats = [];
+      this.scores = { overall: null, ats: null, quality: null, gap: null };
+      this.passSteps.forEach(s => { s.done = false; s.active = false; });
+
+      try {
+        const body = { jd_text: this.jdText, no_pdf: this.noPdf };
+        if (this.jobUrl.trim()) body.job_url = this.jobUrl.trim();
+        const res = await fetch('/api/applications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to start pipeline');
+        }
+
+        const { id } = await res.json();
+        this.currentAppId = id;
+        sessionStorage.setItem('activeRunId', id);
+        this.connectSSE(id);
+      } catch (e) {
+        this.running = false;
+        this.errorMsg = e.message;
+      }
+    },
+
+    connectSSE(appId) {
+      const es = new EventSource(`/api/applications/${appId}/stream`);
+      let activePassIdx = -1;
+
+      es.onmessage = (e) => {
+        const event = JSON.parse(e.data);
+
+        if (event.type === 'section') {
+          const text = event.text;
+          // Determine which pass is starting
+          let idx = -1;
+          if (text.includes('PASS 1 /') || text.includes('PASS 1 —') || text.match(/PASS 1\b/)) idx = 0;
+          else if (text.includes('1b') || text.includes('Inference')) idx = 1;
+          else if (text.includes('PASS 2')) idx = 2;
+          else if (text.includes('PASS 3')) idx = 3;
+          else if (text.includes('PASS 4')) idx = 4;
+
+          if (idx >= 0) {
+            // Mark previous as done
+            if (activePassIdx >= 0 && activePassIdx < this.passSteps.length) {
+              this.passSteps[activePassIdx].active = false;
+              this.passSteps[activePassIdx].done = true;
+            }
+            activePassIdx = idx;
+            this.passSteps[idx].active = true;
+          }
+          this.logLines.push(text);
+
+        } else if (event.type === 'stat') {
+          // Update or add stat
+          const existing = this.stats.find(s => s.key === event.key);
+          if (existing) existing.value = event.value;
+          else this.stats.push({ key: event.key, value: event.value });
+
+        } else if (event.type === 'score') {
+          this.scores = { overall: event.overall, ats: event.ats, quality: event.quality, gap: event.gap ?? null };
+
+        } else if (event.type === 'log') {
+          this.logLines.push(event.text);
+          if (this.logLines.length > 500) this.logLines.splice(0, 100);
+
+        } else if (event.type === 'done') {
+          // Mark all passed steps as done
+          this.passSteps.forEach((s, i) => {
+            if (i <= activePassIdx) { s.done = true; s.active = false; }
+          });
+          this.running = false;
+          this.finished = true;
+          this.hasPdf = event.pdf;
+          sessionStorage.removeItem('activeRunId');
+          es.close();
+
+        } else if (event.type === 'error') {
+          this.pipelineError = true;
+          this.running = false;
+          this.finished = true;
+          this.logLines.push(`ERROR: ${event.message}`);
+          sessionStorage.removeItem('activeRunId');
+          es.close();
+        }
+
+        // Auto-scroll log
+        this.$nextTick(() => {
+          const box = this.$refs.logBox;
+          if (box) box.scrollTop = box.scrollHeight;
+        });
+      };
+
+      es.onerror = () => {
+        if (this.running) {
+          this.logLines.push('[Connection lost — attempting to reconnect...]');
+        }
+      };
+    },
+
+    resetForm() {
+      this.running = false;
+      this.finished = false;
+      this.pipelineError = false;
+      this.errorMsg = '';
+      this.jdText = '';
+      this.jobUrl = '';
+      this.currentAppId = null;
+      this.hasPdf = false;
+      this.logLines = [];
+      this.stats = [];
+      this.scores = { overall: null, ats: null, quality: null, gap: null };
+      this.passSteps.forEach(s => { s.done = false; s.active = false; });
+    },
+
+    async loadApplications() {
+      const res = await fetch('/api/applications');
+      this.applications = await res.json();
+    },
+
+    async fetchQueueStatus() {
+      this.queueStatus = await fetch('/api/queue/status').then(r => r.json());
+    },
+
+    startQueuePoll() {
+      this.fetchQueueStatus();
+      this._queuePollTimer = setInterval(() => {
+        this.fetchQueueStatus(); this.loadApplications();
+      }, 10000);
+    },
+
+    stopQueuePoll() {
+      clearInterval(this._queuePollTimer); this._queuePollTimer = null;
+    },
+
+    async startQueue() {
+      await fetch('/api/queue/start', { method: 'POST' });
+      await this.fetchQueueStatus(); await this.loadApplications();
+    },
+
+    filteredApps() {
+      const statusMap = { processing: 'generating' };
+      const q = this.searchText.trim().toLowerCase();
+      let apps = this.applications.filter(a => {
+        const statusOk = this.statusFilter === 'all' || a.status === (statusMap[this.statusFilter] || this.statusFilter);
+        const catOk    = this.categoryFilter === 'all' || a.category === this.categoryFilter;
+        const searchOk = !q || `${a.company || ''} ${a.role || ''}`.toLowerCase().includes(q);
+        return statusOk && catOk && searchOk;
+      });
+
+      const dir = this.sortDir === 'asc' ? 1 : -1;
+      apps = [...apps].sort((a, b) => {
+        let va, vb;
+        if (this.sortBy === 'score') {
+          va = a.final_score ?? -1;
+          vb = b.final_score ?? -1;
+        } else if (this.sortBy === 'status') {
+          va = a.status || '';
+          vb = b.status || '';
+        } else {
+          va = a.created_at || '';
+          vb = b.created_at || '';
+        }
+        if (va < vb) return -dir;
+        if (va > vb) return dir;
+        return 0;
+      });
+      return apps;
+    },
+
+    setSort(col) {
+      if (this.sortBy === col) {
+        this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.sortBy = col;
+        this.sortDir = col === 'score' ? 'desc' : 'asc';
+      }
+    },
+
+    async applyAndMark(app) {
+      window.open(app.job_url, '_blank');
+      await this.patchApp(app.id, { status: 'applied' });
+    },
+
+    toggleExpand(id) {
+      this.expandedId = this.expandedId === id ? null : id;
+    },
+
+    async patchApp(id, data) {
+      await fetch(`/api/applications/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      await this.loadApplications();
+    },
+
+    confirmDelete(id) {
+      this.deleteConfirmId = id;
+    },
+
+    async deleteApp(id) {
+      await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+      this.deleteConfirmId = null;
+      this.expandedId = null;
+      await this.loadApplications();
+    },
+
+    formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    },
+
+    isOverdue(dateStr) {
+      if (!dateStr) return false;
+      return new Date(dateStr) < new Date(new Date().toDateString());
+    },
+  };
+}
+</script>
+</body>
+</html>

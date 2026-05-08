@@ -1,0 +1,104 @@
+% ===============================================================
+% A clean, modern, and professional LaTeX template for Pandoc résumés.
+% VERSION 4.0 - Final professional version. Uses default LaTeX font and has tighter spacing.
+% ===============================================================
+
+\documentclass[11pt, a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage{fontspec}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{ragged2e}
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% --- DOCUMENT SETUP ---
+\geometry{top=0.7in, bottom=0.7in, left=0.7in, right=0.7in}
+
+% CHANGED: The \setmainfont command is commented out.
+% This will make LaTeX use its beautiful, professional default font (Latin Modern).
+% \setmainfont{Helvetica Neue} 
+
+\definecolor{linkcolor}{RGB}{0, 51, 102}
+
+\hypersetup{
+    colorlinks=true,
+    urlcolor=linkcolor,
+    linkcolor=linkcolor,
+    pdftitle={$title$},
+    pdfauthor={$author$},
+}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+% --- HEADER CUSTOMIZATION ---
+\makeatletter
+\renewcommand{\maketitle}{%
+    \begin{center}
+        \fontsize{24pt}{28pt}\selectfont\bfseries {$author$}
+        % CHANGED: Reduced vertical space for a tighter header
+        \vspace{8pt}
+    \end{center}
+    \begin{center}
+        \large {$address$}
+    \end{center}
+    % CHANGED: Reduced vertical space for a tighter header
+    \vspace{12pt}
+}
+\makeatother
+
+% --- SECTION TITLE CUSTOMIZATION (WORK EXPERIENCE, etc.) ---
+\titleformat{\section}
+  {\large\bfseries\scshape\RaggedRight}
+  {}
+  {0em}
+  {}
+  [\vspace{2pt}{\color{black!80}\titlerule[0.5pt]}]
+
+% CHANGED: Reduced top spacing to pull the first section closer to the header
+\titlespacing*{\section}{0pt}{10pt}{10pt}
+
+% --- COMPANY NAME CUSTOMIZATION ---
+\titleformat{\subsection}
+  {\large\bfseries}
+  {}
+  {0em}
+  {}
+
+\titlespacing*{\subsection}{0pt}{4pt}{1pt}
+
+% --- JOB TITLE & DATE LINE CUSTOMIZATION ---
+\titleformat{\subsubsection}
+  {\normalsize\itshape}
+  {}
+  {0em}
+  {}
+
+\titlespacing*{\subsubsection}{0pt}{2pt}{6pt}
+
+
+% --- BULLET POINT CUSTOMIZATION ---
+\setlist[itemize]{
+    leftmargin=1.5em,
+    nosep,
+    topsep=3pt,
+    itemsep=4pt,
+    label=\textbullet
+}
+
+% --- DOCUMENT START ---
+\begin{document}
+
+$if(author)$
+    \maketitle
+$endif$
+
+$body$
+
+\end{document}

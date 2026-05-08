@@ -1,0 +1,20 @@
+Why You Should Apply
+- Join a data-first business intelligence platform and tech product company originating from Europe.
+- Work on discovering hidden value in unstructured data that drives significant business impact.
+- Be part of a process that emphasizes tracking, measuring, and iterating, rather than simply handling data in and out.
+- Deliver actionable insights to corporate and enterprise clients, moving beyond standard reporting.
+- Future-proof your career by developing as a full stack data engineer and analytics professional, gaining a comprehensive understanding of the data lifecycle.
+
+Key Responsibilities
+- Split your role equally between data engineering (50%) and analytics (50%).
+- Identify and analyze trends, and conduct ad-hoc analyses to generate insights that support client decision-making.
+- Collaborate with project managers and engineers to understand client needs, connect data sources, and deliver tailored solutions.
+- Design, develop, and implement data pipelines to ingest and transform large volumes of data, and build scalable data models that power the core platform.
+- Perform data integration and preparation, including ETL processes and data structure optimization, to streamline analysis workflows.
+
+Requirements
+- Educational background in Mathematics and Statistics, Analytics, Actuarial Science, or Data Science.
+- Strong analytical mindset with a passion for working with numbers and converting data into actionable insights.
+- Ability to define and solve ambiguous, open-ended business problems using exploratory and analytical approaches.
+- Proficiency in SQL and Python for data transformation, cleaning, and preparation.
+- Current experience in Data Analytics or as a Data Analyst, Data Engineer, or Business Intelligence professional, with a strong analytics background.

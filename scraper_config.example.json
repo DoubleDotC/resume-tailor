@@ -1,0 +1,55 @@
+{
+  "_comment": "Copy this file to scraper_config.json and edit. The real file is gitignored.",
+
+  "platforms": ["linkedin"],
+
+  "locations": {
+    "linkedin": [
+      "Toronto, Ontario",
+      "Vancouver, British Columbia",
+      "Remote, Canada"
+    ]
+  },
+
+  "categories": {
+    "data_analyst": [
+      "data analyst", "business intelligence analyst", "Power BI analyst",
+      "analytics engineer", "BI developer", "reporting analyst"
+    ],
+    "cybersecurity": [
+      "cybersecurity analyst", "SOC analyst",
+      "information security analyst", "threat intelligence analyst",
+      "cloud security analyst"
+    ],
+    "business_analyst": [
+      "business analyst", "strategy analyst",
+      "process analyst", "product analyst"
+    ]
+  },
+
+  "max_per_platform": {"linkedin": 200},
+  "max_per_query": 5,
+  "platform_timeout_secs": 3600,
+
+  "exclude_companies": [
+    "RBC", "TD", "Scotiabank", "BMO", "CIBC",
+    "JPMorgan", "Goldman Sachs", "Citibank", "HSBC"
+  ],
+
+  "exclude_title_keywords": [
+    "audit", "auditor", "intern", "internship",
+    "citizen only", "nationals only",
+    "FTC", "fixed term", "temporary", "temp",
+    "fresh graduate", "new grad", "student",
+    "contract", "part-time", "part time", "freelance",
+    "volunteer", "graduate programme", "graduate program",
+    "management trainee", "trainee"
+  ],
+
+  "_chrome_profile_help": "Path to a Chrome user-data dir. macOS default: '/Users/<you>/Library/Application Support/Google/Chrome/Default'. First run opens a visible window so you can log in to LinkedIn; subsequent runs reuse the session.",
+  "linkedin_user_data_dir": "<YOUR_CHROME_PROFILE_DIR>",
+
+  "db_path": "data/applications.db",
+  "delay_min": 2.0,
+  "delay_max": 5.0
+}
