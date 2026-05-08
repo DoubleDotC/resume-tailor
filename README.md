@@ -90,13 +90,76 @@ python3 process_queue.py --dry-run
 **LinkedIn first run:** opens a visible browser window so you can log in once.
 Subsequent runs are headless and reuse the session.
 
-### Single job (CLI)
+### Option C — tailor to a single JD (no scraping, no dashboard)
+
+If you just want to adapt your resume to one specific job posting, skip the
+scraper and dashboard entirely and run `mlx_resume_v4.py` directly. This is the
+fastest way to use the tool.
+
+**Setup (once):**
 
 ```bash
 source venv/bin/activate
-python3 mlx_resume_v4.py my_output --master master_resume.md --job job_description.txt
-python3 mlx_resume_v4.py my_output --no-pdf --min-score 80
+cp master_resume.example.md master_resume.md   # then edit with your real info
 ```
+
+**Per job:**
+
+```bash
+# 1. Paste the job posting text into job_description.txt (overwrite freely)
+#    — or keep multiple JDs as separate files: jd_acme.txt, jd_globex.txt, etc.
+
+# 2. Run the pipeline. The first arg is the output name (no extension).
+python3 mlx_resume_v4.py acme_data_analyst \
+    --master master_resume.md \
+    --job job_description.txt
+```
+
+**Outputs land in your current directory:**
+
+- `acme_data_analyst.md` — tailored resume, Markdown
+- `acme_data_analyst.pdf` — same, rendered via `pandoc` + `xelatex`
+- `acme_data_analyst_debug/` — every pass's raw LLM output (analyzer JSON,
+  validator scores, etc.) — handy if a pass misbehaves
+
+First run downloads the MLX model (~5 GB) into your Hugging Face cache. After
+that, expect ~3–5 minutes per job on an M-series MacBook Air with 16 GB RAM.
+
+**Useful flags:**
+
+| Flag | What it does |
+| --- | --- |
+| `--no-pdf` | Markdown only — skips pandoc/xelatex. Fastest. |
+| `--no-validate` | Skip passes 3 & 4 (validator + corrector). Trades quality for ~40% speed. |
+| `--no-inference` | Skip pass 1b. Blocked keywords stay blocked instead of being semantically inferred. |
+| `--no-debug` | Don't write the `_debug/` folder. |
+| `--min-score N` | Warn threshold for final ATS score (default `70`). Set higher to be stricter. |
+| `--writer-temp F` | Writer-pass temperature, 0.0–1.0 (default `0.7`). Lower = more conservative bullets. |
+| `--retries N` | Extra JSON-parse retries per pass on failure (default `2`). |
+| `--model PATH` | Use a different MLX model. Default is `mlx-community/Qwen3.5-9B-MLX-4bit`. |
+| `--analyzer-model PATH` | Use a separate (often smaller) model for the analyzer pass only. |
+| `--thinking` | Enable Qwen thinking mode for the corrector — only useful on 32B+ models. |
+
+**Examples:**
+
+```bash
+# Quick draft, Markdown only
+python3 mlx_resume_v4.py quick_draft --no-pdf --no-validate
+
+# Stricter ATS bar
+python3 mlx_resume_v4.py acme_v2 --min-score 85
+
+# Two JDs in parallel terminals (each spawns its own MLX process — make sure
+# you have RAM headroom; 16 GB Macs should run them sequentially instead)
+python3 mlx_resume_v4.py acme   --job jd_acme.txt
+python3 mlx_resume_v4.py globex --job jd_globex.txt
+```
+
+**Tip:** the quality of the output is bounded by your `master_resume.md`. The
+writer pass can rephrase, reorder, and emphasize what's already there, but it
+won't fabricate experience. If the JD asks for a tool you've genuinely used,
+make sure that tool appears somewhere in your master resume — otherwise the
+inference pass blocks it as missing.
 
 ## How it works
 
